@@ -1,41 +1,50 @@
 from cards.CardDeck import CardDeck
+from Weapon import Weapon
+
+DEFAULT_HEALTH = 20
 
 def record_card(picked_card, weapon, health):
     suit = picked_card.suit
     val = picked_card.val
 
     if suit == 'hearts':
-        health = heal(health, val)
+        health = min(health + val, DEFAULT_HEALTH)
     elif suit == 'diamonds':
-        weapon = [val, weapon[1]]
+        weapon.damage = val
+        weapon.last_enemy_rank = 15
     else:
         weapon, health = battle(weapon, health, val)
 
     return weapon, health
 
-def heal(health, val):
-    health += val
-
-    if health > 20:
-        health = 20
-
-    return health
-
 def battle(weapon, health, curr_enemy_rank):
-    weapon_damage = weapon[0]
-    prev_enemy_rank = weapon[1]
-    battle_type = input('0 - barehanded fight | 1 - with weapon: ')
+    #absence of weapon OR lack of rank
+    if weapon.damage == 0 or curr_enemy_rank >= weapon.last_enemy_rank:
+        health -= curr_enemy_rank
+        return weapon, health
+
+    battle_type = int(input('0 - barehanded fight | 1 - with weapon: '))
 
     if battle_type == 1:
-        if curr_enemy_rank >= prev_enemy_rank:
-            health -= curr_enemy_rank
-        else:
-            health -= max(curr_enemy_rank - weapon_damage, 0)
-            weapon[1] = curr_enemy_rank
+        health -= max((curr_enemy_rank - weapon.damage), 0)
+        weapon.last_enemy_rank = curr_enemy_rank
     else:
         health -= curr_enemy_rank
 
     return weapon, health
+
+
+def skip_dungeon(cards, n):
+    moved = cards[:n]
+    del cards[:n]
+    cards.extend(moved)
+    return cards
+
+def display_stats(dungeon_cards, health, cards_left_num, weapon):
+    print()
+    print('Health:', health, '| Cards left:', cards_left_num)
+    print('Weapon:', weapon)
+    print(dungeon_cards)
 
 
 class Scoundrel:
@@ -43,18 +52,38 @@ class Scoundrel:
         self.card_deck = CardDeck()
 
     def start(self):
-        health = 20
-        weapon = [0, 0] #damage, previous enemy rank
+        health = DEFAULT_HEALTH
+        weapon = Weapon(0,15)
         cards = self.card_deck.get_shuffled_card_deck()
+        skip_dungeon_available = True
 
         dungeon = cards[0:4]
 
         while len(cards) >= 4:
-            print('Weapon:', weapon, '| Health:', health, '| Cards left:', len(cards))
-            print(dungeon)
+            if skip_dungeon_available:
+                display_stats(dungeon, health, len(cards), weapon)
+                enter_dungeon = int(input('-1 to skip, 0 to enter: '))
 
-            picked_card = dungeon[int(input('Pick a card: '))]
+                if enter_dungeon == -1:
+                    skip_dungeon(cards, len(dungeon))
 
-            weapon, health = record_card(picked_card, weapon, health)
+                    dungeon = cards[0:4]
+                    skip_dungeon_available = False
+                    continue
 
-            cards.pop()
+            while len(dungeon) > 1:
+                display_stats(dungeon, health, len(cards), weapon)
+                picked_card_index = int(input('Pick a card: '))
+                picked_card = dungeon[picked_card_index]
+
+                weapon, health = record_card(picked_card, weapon, health)
+
+                if health <= 0:
+                    print('Death')
+                    break
+
+                dungeon.pop(picked_card_index)
+                cards.pop(picked_card_index)
+
+            dungeon.extend(cards[1:4])
+            skip_dungeon_available = True
